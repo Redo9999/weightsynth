@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "WeightSynth",
+    "slug": "weightsynth",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6366f1"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.redo9999.weightsynth",
+      "buildNumber": "1"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#6366f1"
+      },
+      "package": "com.redo9999.weightsynth",
+      "versionCode": 1,
+      "permissions": []
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-linear-gradient"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "SEU_PROJECT_ID_AQUI"
+      }
+    }
+  }
+}
