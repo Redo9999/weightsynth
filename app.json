@@ -2,7 +2,7 @@
   "expo": {
     "name": "WeightSynth",
     "slug": "weightsynth",
-    "version": "1.0.0",
+    "version": "1.2.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -13,7 +13,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.redo9999.weightsynth",
+      "bundleIdentifier": "com.seudominio.weightsynth",
       "buildNumber": "1"
     },
     "android": {
@@ -21,7 +21,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#6366f1"
       },
-      "package": "com.redo9999.weightsynth",
+      "package": "com.seudominio.weightsynth",
       "versionCode": 1,
       "permissions": []
     },

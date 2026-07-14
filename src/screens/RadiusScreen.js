@@ -1,6 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// RadiusScreen — calcula raio interno e externo de um tubo
-// a partir da circunferência externa (fita métrica) e espessura (paquímetro)
+// RadiusScreen.js — Cálculo de circunferência interna
+// WeightSynth v1.2.071326-BETA
+//
+// Fluxo:
+//   1. Usuário mede circunferência EXTERNA com fita métrica (mm)
+//   2. Usuário mede espessura da parede com paquímetro (mm, aceita vírgula)
+//   3. App calcula: C_int = π × (C_ext/π − 2×esp)
+//      e exibe também: ∅e, ∅i, Re, Ri
 // ─────────────────────────────────────────────────────────────────────────────
 import React, { useState } from "react";
 import {
@@ -11,188 +17,162 @@ import { LinearGradient } from "expo-linear-gradient";
 import { parseSecure, LIMITS, ERRORS } from "../utils/validation";
 
 const PI = Math.PI;
+const fmt2 = (v) => v.toFixed(2);
+const fmt4 = (v) => v.toFixed(4);
 
-const C = {
-  accent: "#6366f1",
-  green:  "#10b981",
-  amber:  "#f59e0b",
-  red:    "#ef4444",
-  border: "#e2e8f0",
-  muted:  "#94a3b8",
-  text:   "#1e293b",
-  sub:    "#64748b",
-  bg:     "#f8fafc",
-};
+// Aceita tanto vírgula quanto ponto como separador decimal
+function parseInput(str) {
+  if (!str) return null;
+  const normalized = str.replace(",", ".");
+  const v = parseFloat(normalized);
+  return isNaN(v) ? null : v;
+}
 
-const fmt = (v) => v.toFixed(2);
-
-// ── Diagrama do tubo desenhado com Views ─────────────────────────────────────
-function TubeDiagram({ step }) {
-  const outerR = 70, innerR = 44, h = 8;
-
+// ── Diagrama por Views ────────────────────────────────────────────────────────
+function TubeDiagram({ step, theme }) {
+  const outerR = 64, innerR = 40;
   return (
-    <View style={d.diagramWrap}>
-
-      {/* Vista frontal do tubo (seção circular) */}
-      <View style={d.frontView}>
-
+    <View style={[d.wrap, { backgroundColor: theme.card }]}>
+      {/* Vista frontal — seção circular */}
+      <View style={d.front}>
         {/* Anel externo */}
-        <View style={[d.circle, {
+        <View style={[d.ring, {
           width: outerR * 2, height: outerR * 2, borderRadius: outerR,
-          backgroundColor: "#c7d2fe", borderWidth: 2, borderColor: C.accent,
+          backgroundColor: theme.accentBg,
+          borderWidth: 2, borderColor: theme.accent,
           justifyContent: "center", alignItems: "center",
         }]}>
           {/* Furo interno */}
-          <View style={[d.circle, {
+          <View style={[d.ring, {
             width: innerR * 2, height: innerR * 2, borderRadius: innerR,
-            backgroundColor: "#6366f1", opacity: 0.25,
-            borderWidth: 1.5, borderColor: C.accent,
+            backgroundColor: theme.bg,
+            borderWidth: 1.5, borderColor: theme.accent,
           }]} />
         </View>
 
-        {/* Seta fita métrica — aparece no passo 1 */}
+        {/* Fita métrica — passo 1 */}
         {step >= 1 && (
-          <View style={d.tapeRow}>
-            <View style={[d.tapeLine, { backgroundColor: C.amber }]} />
-            <Text style={[d.tapeLabel, { color: C.amber }]}>
-              C ext (fita métrica)
-            </Text>
+          <View style={d.annotRow}>
+            <View style={[d.annotLine, { backgroundColor: theme.amber, width: 90 }]} />
+            <Text style={[d.annotLbl, { color: theme.amber }]}>C ext (fita)</Text>
           </View>
         )}
 
-        {/* Seta espessura — aparece no passo 2 */}
+        {/* Espessura — passo 2 */}
         {step >= 2 && (
-          <View style={d.espRow}>
-            <View style={[d.espLine, { backgroundColor: C.green }]} />
-            <Text style={[d.espLabel, { color: C.green }]}>esp (paquímetro)</Text>
-          </View>
-        )}
-      </View>
-
-      {/* Linha lateral com raios — aparece no resultado */}
-      {step >= 3 && (
-        <View style={d.radiiRow}>
-          <View style={d.radiiItem}>
-            <View style={[d.radiiLine, { backgroundColor: C.red, width: outerR }]} />
-            <Text style={[d.radiiLabel, { color: C.red }]}>Re</Text>
-          </View>
-          <View style={d.radiiItem}>
-            <View style={[d.radiiLine, {
-              backgroundColor: C.green, width: innerR,
+          <View style={d.annotRow}>
+            <View style={[d.annotLine, {
+              backgroundColor: theme.green, width: 24,
               borderStyle: "dashed",
             }]} />
-            <Text style={[d.radiiLabel, { color: C.green }]}>Ri</Text>
+            <Text style={[d.annotLbl, { color: theme.green }]}>esp (paquímetro)</Text>
           </View>
-        </View>
-      )}
+        )}
 
-      {/* Legenda */}
-      <View style={d.legend}>
-        {step >= 1 && <View style={d.legendItem}>
-          <View style={[d.legendDot, { backgroundColor: C.amber }]} />
-          <Text style={d.legendTxt}>Fita métrica → C ext</Text>
-        </View>}
-        {step >= 2 && <View style={d.legendItem}>
-          <View style={[d.legendDot, { backgroundColor: C.green }]} />
-          <Text style={d.legendTxt}>Paquímetro → espessura</Text>
-        </View>}
-        {step >= 3 && <View style={d.legendItem}>
-          <View style={[d.legendDot, { backgroundColor: C.red }]} />
-          <Text style={d.legendTxt}>Re / Ri calculados</Text>
-        </View>}
+        {/* Circunferência interna — resultado */}
+        {step >= 3 && (
+          <View style={d.annotRow}>
+            <View style={[d.annotLine, { backgroundColor: theme.red, width: 55 }]} />
+            <Text style={[d.annotLbl, { color: theme.red }]}>C int (resultado)</Text>
+          </View>
+        )}
       </View>
     </View>
   );
 }
 
-// ── Cartão de passo ──────────────────────────────────────────────────────────
-function StepCard({ num, title, desc, color, active, done }) {
+// ── Cartão de passo ───────────────────────────────────────────────────────────
+function StepCard({ num, title, desc, color, active, done, theme }) {
   return (
-    <View style={[
-      s.stepCard,
-      active && { backgroundColor: `${color}10`, borderColor: color },
-      done  && { backgroundColor: "#f0fdf4", borderColor: C.green },
-    ]}>
-      <View style={[s.stepBadge,
-        { backgroundColor: done ? C.green : active ? color : C.muted }]}>
-        <Text style={s.stepBadgeTxt}>{done ? "✓" : num}</Text>
+    <View style={[sc.card, {
+      backgroundColor: active ? `${color}12` : done ? `${theme.green}10` : theme.card,
+      borderColor: active ? color : done ? theme.green : theme.border,
+    }]}>
+      <View style={[sc.badge, {
+        backgroundColor: done ? theme.green : active ? color : theme.textMuted,
+      }]}>
+        <Text style={sc.badgeTxt}>{done ? "✓" : num}</Text>
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={[s.stepTitle,
-          { color: done ? C.green : active ? color : C.text }]}>{title}</Text>
-        <Text style={s.stepDesc}>{desc}</Text>
+        <Text style={[sc.title, {
+          color: done ? theme.green : active ? color : theme.text,
+        }]}>{title}</Text>
+        <Text style={[sc.desc, { color: theme.textSub }]}>{desc}</Text>
       </View>
     </View>
   );
 }
 
 // ── Chip de resultado ─────────────────────────────────────────────────────────
-function Chip({ label, value, color }) {
+function ResultChip({ label, value, color, theme, large }) {
   return (
-    <View style={[s.chip, { borderColor: `${color}30`, backgroundColor: `${color}10` }]}>
-      <Text style={[s.chipLabel, { color }]}>{label}</Text>
-      <Text style={s.chipValue}>{value}</Text>
+    <View style={[rc.chip, {
+      backgroundColor: `${color}12`,
+      borderColor: `${color}30`,
+      flex: large ? 2 : 1,
+    }]}>
+      <Text style={[rc.label, { color }]}>{label}</Text>
+      <Text style={[rc.value, { color: theme.text, fontSize: large ? 20 : 15 }]}>
+        {value}
+      </Text>
     </View>
   );
 }
 
 // ── TELA PRINCIPAL ────────────────────────────────────────────────────────────
-export default function RadiusScreen() {
-  const [step, setStep]       = useState(0);
-  const [cExt, setCExt]       = useState("");
-  const [espessura, setEsp]   = useState("");
-  const [resultado, setRes]   = useState(null);
+export default function RadiusScreen({ theme, lang }) {
+  const [step, setStep]     = useState(0);
+  const [cExt, setCExt]     = useState("");
+  const [esp, setEsp]       = useState("");
+  const [resultado, setRes] = useState(null);
 
   const handleCExt = (v) => {
     setCExt(v);
-    setStep(v ? 1 : 0);
+    setStep(v.trim() ? 1 : 0);
     setRes(null);
   };
 
   const handleEsp = (v) => {
     setEsp(v);
-    if (v && cExt) setStep(2);
-    else if (cExt) setStep(1);
+    if (v.trim() && cExt.trim()) setStep(2);
+    else if (cExt.trim()) setStep(1);
     setRes(null);
   };
 
   const calcular = () => {
-    const c = parseSecure(cExt);
-    const e = parseSecure(espessura);
+    const c = parseInput(cExt);
+    const e = parseInput(esp);
 
-    if (c === null || c <= 0) {
+    if (!c || c <= 0) {
       Alert.alert("Atenção", "Informe a circunferência externa medida com a fita.");
       return;
     }
-    if (c < LIMITS.CIRC_MIN || c > LIMITS.CIRC_MAX) {
-      Alert.alert("Atenção", `Circunferência deve estar entre ${LIMITS.CIRC_MIN} e ${LIMITS.CIRC_MAX.toLocaleString()} mm.`);
+    if (c < 1 || c > 99999) {
+      Alert.alert("Atenção", "Circunferência deve estar entre 1 e 99.999 mm.");
       return;
     }
-    if (e === null || e <= 0) {
+    if (!e || e <= 0) {
       Alert.alert("Atenção", "Informe a espessura da parede medida com o paquímetro.");
       return;
     }
-    if (e < LIMITS.THICKNESS_MIN || e > LIMITS.DIM_MAX) {
-      Alert.alert("Atenção", `Espessura mínima aceita: ${LIMITS.THICKNESS_MIN} mm.`);
+    if (e < 0.01) {
+      Alert.alert("Atenção", "Espessura mínima: 0,01 mm.");
       return;
     }
 
-    const dExt = c / PI;
-    const rExt = dExt / 2;
-    const rInt = rExt - e;
-    const dInt = rInt * 2;
-    const cInt = PI * dInt;
+    // Cálculos
+    const dExt = c / PI;           // diâmetro externo
+    const rExt = dExt / 2;         // raio externo
+    const rInt = rExt - e;         // raio interno
+    const dInt = rInt * 2;         // diâmetro interno
+    const cInt = PI * dInt;        // circunferência interna ← resultado principal
 
     if (rInt <= 0) {
-      Alert.alert("Erro", ERRORS.THICKNESS_BIG);
-      return;
-    }
-    if (!isFinite(rExt) || !isFinite(rInt)) {
-      Alert.alert("Erro", "Resultado inválido. Verifique os valores informados.");
+      Alert.alert("Erro", "A espessura é maior que o raio externo. Verifique os valores.");
       return;
     }
 
-    setRes({ dExt, rExt, rInt, dInt, cInt, cOrig: c, eOrig: e });
+    setRes({ c, e, dExt, rExt, rInt, dInt, cInt });
     setStep(3);
   };
 
@@ -201,156 +181,198 @@ export default function RadiusScreen() {
   };
 
   return (
-    <ScrollView style={s.scroll} contentContainerStyle={s.container}
+    <ScrollView
+      style={[s.scroll, { backgroundColor: theme.bg }]}
+      contentContainerStyle={s.container}
       keyboardShouldPersistTaps="handled">
 
       {/* DIAGRAMA */}
-      <View style={s.card}>
-        <TubeDiagram step={step} />
-      </View>
+      <TubeDiagram step={step} theme={theme} />
 
       {/* PASSOS */}
-      <View style={s.card}>
-        <Text style={s.cardTitle}>📋 Como medir</Text>
+      <View style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[s.cardTitle, { color: theme.text }]}>📋 Como medir</Text>
 
-        <StepCard num={1} color={C.amber}
-          active={step === 0 || step === 1} done={step >= 2}
+        <StepCard num={1} color={theme.amber}
+          active={step === 0 || step === 1} done={step >= 2} theme={theme}
           title="Medir circunferência externa com fita"
-          desc="Envolva a fita metálica ao redor do tubo e anote a medida em milímetros." />
+          desc="Envolva a fita ao redor do tubo/cilindro e anote em milímetros." />
 
-        <StepCard num={2} color={C.green}
-          active={step === 2} done={step >= 3}
+        <StepCard num={2} color={theme.green}
+          active={step === 2} done={step >= 3} theme={theme}
           title="Medir espessura da parede com paquímetro"
-          desc="Apoie o paquímetro na borda da face do tubo e meça a espessura em milímetros." />
+          desc="Apoie o paquímetro na borda da face. Aceita decimais (ex: 3,22 mm)." />
 
-        <StepCard num={3} color={C.accent}
-          active={step === 3} done={false}
-          title="Calcular — o app faz o resto"
-          desc="Com C e espessura, calculamos ∅e, Re, Ri, ∅i e a circunferência interna." />
+        <StepCard num={3} color={theme.accent}
+          active={step === 3} done={false} theme={theme}
+          title="Resultado — circunferência interna"
+          desc="C_int = π × (C_ext÷π − 2×espessura). Exibido em mm com 4 casas." />
       </View>
 
       {/* INPUTS */}
-      <View style={s.card}>
-        <Text style={s.cardTitle}>📐 Inserir medidas</Text>
+      <View style={[s.card, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        <Text style={[s.cardTitle, { color: theme.text }]}>📐 Inserir medidas</Text>
 
-        {/* Campo circunferência */}
+        {/* Campo 1 — circunferência externa */}
         <View style={s.inpWrap}>
-          <Text style={[s.inpLabel, { color: C.amber }]}>
+          <Text style={[s.inpLabel, { color: theme.amber }]}>
             PASSO 1 — Circunferência externa (mm)
           </Text>
           <View style={s.inpRow}>
             <TextInput
-              style={[s.inp, cExt && { borderColor: C.amber }]}
+              style={[s.inp, {
+                backgroundColor: theme.inputBg,
+                borderColor: cExt ? theme.amber : theme.border,
+                color: theme.text,
+              }]}
               placeholder="ex: 314.16"
-              placeholderTextColor={C.muted}
-              keyboardType="numeric"
+              placeholderTextColor={theme.textMuted}
+              keyboardType="decimal-pad"
               value={cExt}
               onChangeText={handleCExt}
             />
-            <View style={[s.inpUnit, { backgroundColor: `${C.amber}15` }]}>
-              <Text style={[s.inpUnitTxt, { color: C.amber }]}>mm</Text>
+            <View style={[s.unit, { backgroundColor: `${theme.amber}18` }]}>
+              <Text style={[s.unitTxt, { color: theme.amber }]}>mm</Text>
             </View>
           </View>
-          {cExt !== "" && !isNaN(parseFloat(cExt)) && (
-            <Text style={[s.inpHint, { color: C.amber }]}>
-              → ∅e ≈ {fmt(parseFloat(cExt) / PI)} mm
-              {"  "}|{"  "}
-              Re ≈ {fmt(parseFloat(cExt) / PI / 2)} mm
+          {/* Preview em tempo real */}
+          {cExt !== "" && parseInput(cExt) > 0 && (
+            <Text style={[s.hint, { color: theme.amber }]}>
+              → ∅ externo ≈ {fmt2(parseInput(cExt) / PI)} mm
             </Text>
           )}
         </View>
 
-        {/* Campo espessura */}
+        {/* Campo 2 — espessura */}
         <View style={s.inpWrap}>
-          <Text style={[s.inpLabel, { color: C.green }]}>
-            PASSO 2 — Espessura da parede (mm)
+          <Text style={[s.inpLabel, { color: theme.green }]}>
+            PASSO 2 — Espessura da parede (mm) — use vírgula ou ponto decimal
           </Text>
           <View style={s.inpRow}>
             <TextInput
-              style={[s.inp, espessura && { borderColor: C.green }]}
-              placeholder="ex: 5.0"
-              placeholderTextColor={C.muted}
-              keyboardType="numeric"
-              value={espessura}
+              style={[s.inp, {
+                backgroundColor: theme.inputBg,
+                borderColor: esp ? theme.green : theme.border,
+                color: theme.text,
+              }]}
+              placeholder="ex: 3,22  ou  3.22"
+              placeholderTextColor={theme.textMuted}
+              keyboardType="decimal-pad"
+              value={esp}
               onChangeText={handleEsp}
             />
-            <View style={[s.inpUnit, { backgroundColor: `${C.green}15` }]}>
-              <Text style={[s.inpUnitTxt, { color: C.green }]}>mm</Text>
+            <View style={[s.unit, { backgroundColor: `${theme.green}18` }]}>
+              <Text style={[s.unitTxt, { color: theme.green }]}>mm</Text>
             </View>
           </View>
+          {esp !== "" && parseInput(esp) > 0 && (
+            <Text style={[s.hint, { color: theme.green }]}>
+              → Espessura: {fmt2(parseInput(esp))} mm confirmada
+            </Text>
+          )}
         </View>
 
-        {/* Botão */}
-        <TouchableOpacity style={s.calcBtn} onPress={calcular}>
-          <Text style={s.calcBtnTxt}>⚙  Calcular raios</Text>
+        <TouchableOpacity
+          style={[s.calcBtn, { backgroundColor: theme.accent }]}
+          onPress={calcular}>
+          <Text style={s.calcBtnTxt}>⚙  Calcular circunferência interna</Text>
         </TouchableOpacity>
       </View>
 
       {/* RESULTADO */}
       {resultado && (
         <LinearGradient
-          colors={["#6366f108", "#818cf808"]}
-          style={[s.card, { borderColor: `${C.accent}30` }]}>
+          colors={[`${theme.accent}10`, `${theme.accent}05`]}
+          style={[s.card, { borderColor: `${theme.accent}30` }]}>
 
-          <Text style={[s.cardTitle, { color: C.accent }]}>✦ Resultado</Text>
+          <Text style={[s.cardTitle, { color: theme.accent }]}>
+            ✦ Resultado
+          </Text>
 
-          {/* chips principais */}
-          <View style={s.chipGrid2}>
-            <Chip label="Raio Externo (Re)"
-              value={`${fmt(resultado.rExt)} mm`} color={C.red} />
-            <Chip label="Raio Interno (Ri)"
-              value={`${fmt(resultado.rInt)} mm`} color={C.green} />
-          </View>
-
-          <View style={s.chipGrid3}>
-            <Chip label="∅ Externo"
-              value={`${fmt(resultado.dExt)} mm`} color={C.accent} />
-            <Chip label="∅ Interno"
-              value={`${fmt(resultado.dInt)} mm`} color={C.accent} />
-            <Chip label="C interna"
-              value={`${fmt(resultado.cInt)} mm`} color={C.amber} />
-          </View>
-
-          {/* fórmulas */}
-          <View style={s.formulaBox}>
-            <Text style={s.formulaTitle}>📐 Cálculo passo a passo:</Text>
-            <Text style={s.formulaLine}>
-              ∅e = C ÷ π = {fmt(resultado.cOrig)} ÷ 3.14159
-              {" = "}<Text style={s.formulaBold}>{fmt(resultado.dExt)} mm</Text>
+          {/* RESULTADO PRINCIPAL — C interna */}
+          <View style={[s.mainResult, {
+            backgroundColor: theme.accentBg,
+            borderColor: theme.accentBorder,
+          }]}>
+            <Text style={[s.mainLabel, { color: theme.accent }]}>
+              CIRCUNFERÊNCIA INTERNA
             </Text>
-            <Text style={s.formulaLine}>
-              Re = ∅e ÷ 2 = {fmt(resultado.dExt)} ÷ 2
-              {" = "}<Text style={[s.formulaBold, { color: C.red }]}>{fmt(resultado.rExt)} mm</Text>
+            <Text style={[s.mainValue, { color: theme.text }]}>
+              {fmt4(resultado.cInt)}
+              <Text style={[s.mainUnit, { color: theme.textSub }]}> mm</Text>
             </Text>
-            <Text style={s.formulaLine}>
-              Ri = Re − esp = {fmt(resultado.rExt)} − {fmt(resultado.eOrig)}
-              {" = "}<Text style={[s.formulaBold, { color: C.green }]}>{fmt(resultado.rInt)} mm</Text>
-            </Text>
-            <Text style={s.formulaLine}>
-              ∅i = Ri × 2 = {fmt(resultado.rInt)} × 2
-              {" = "}<Text style={s.formulaBold}>{fmt(resultado.dInt)} mm</Text>
-            </Text>
-            <Text style={s.formulaLine}>
-              C int = π × ∅i = {fmt(resultado.dInt)} × 3.14159
-              {" = "}<Text style={[s.formulaBold, { color: C.amber }]}>{fmt(resultado.cInt)} mm</Text>
+            <Text style={[s.mainPi, { color: theme.textMuted }]}>
+              = π × {fmt4(resultado.dInt)} mm
             </Text>
           </View>
 
-          <TouchableOpacity style={s.resetBtn} onPress={reset}>
-            <Text style={s.resetBtnTxt}>↩  Novo cálculo</Text>
+          {/* Chips secundários */}
+          <View style={s.chipRow}>
+            <ResultChip label="C externa" value={`${fmt4(resultado.c)} mm`}
+              color={theme.amber} theme={theme} />
+            <ResultChip label="Espessura" value={`${fmt2(resultado.e)} mm`}
+              color={theme.green} theme={theme} />
+          </View>
+          <View style={s.chipRow}>
+            <ResultChip label="∅ Externo" value={`${fmt2(resultado.dExt)} mm`}
+              color={theme.accent} theme={theme} />
+            <ResultChip label="∅ Interno" value={`${fmt2(resultado.dInt)} mm`}
+              color={theme.accent} theme={theme} />
+          </View>
+          <View style={s.chipRow}>
+            <ResultChip label="Raio Ext (Re)" value={`${fmt2(resultado.rExt)} mm`}
+              color={theme.red} theme={theme} />
+            <ResultChip label="Raio Int (Ri)" value={`${fmt2(resultado.rInt)} mm`}
+              color={theme.red} theme={theme} />
+          </View>
+
+          {/* Fórmulas */}
+          <View style={[s.formula, {
+            backgroundColor: theme.bg, borderColor: theme.border,
+          }]}>
+            <Text style={[s.formulaTitle, { color: theme.text }]}>
+              📐 Cálculo passo a passo:
+            </Text>
+            <Text style={[s.formulaLine, { color: theme.textSub }]}>
+              ∅e = C_ext ÷ π = {fmt4(resultado.c)} ÷ π ={" "}
+              <Text style={{ fontWeight:"700", color: theme.text }}>
+                {fmt4(resultado.dExt)} mm
+              </Text>
+            </Text>
+            <Text style={[s.formulaLine, { color: theme.textSub }]}>
+              ∅i = ∅e − 2×esp = {fmt2(resultado.dExt)} − 2×{fmt2(resultado.e)} ={" "}
+              <Text style={{ fontWeight:"700", color: theme.text }}>
+                {fmt4(resultado.dInt)} mm
+              </Text>
+            </Text>
+            <Text style={[s.formulaLine, { color: theme.textSub }]}>
+              C_int = π × ∅i = π × {fmt4(resultado.dInt)} ={" "}
+              <Text style={{ fontWeight:"700", color: theme.accent }}>
+                {fmt4(resultado.cInt)} mm
+              </Text>
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={[s.resetBtn, {
+              backgroundColor: theme.card, borderColor: theme.border,
+            }]}
+            onPress={reset}>
+            <Text style={[s.resetTxt, { color: theme.textSub }]}>
+              ↩  Novo cálculo
+            </Text>
           </TouchableOpacity>
         </LinearGradient>
       )}
 
-      {/* DICA DE CAMPO */}
-      <View style={s.tipBox}>
+      {/* DICA */}
+      <View style={[s.tip, { backgroundColor: "#fffbeb", borderColor: "#fde68a" }]}>
         <Text style={s.tipTitle}>💡 Dica de campo</Text>
         <Text style={s.tipTxt}>
-          Sem fita métrica? Use um barbante ou cabo fino para envolver o tubo,
-          marque o ponto de volta e meça com uma régua — isso dá a circunferência.
-          {"\n\n"}
-          Para a espessura, um paquímetro digital de R$30~50 resolve na
-          maioria dos casos industriais.
+          Sem fita métrica? Use um barbante, envolva o tubo, marque o ponto
+          de volta e meça com uma régua — isso dá a circunferência.{"\n\n"}
+          O paquímetro aceita casas decimais (ex: 3,22 mm). Use o cursor
+          de profundidade para medir a espessura da parede na face do tubo.
         </Text>
       </View>
 
@@ -360,99 +382,60 @@ export default function RadiusScreen() {
 
 // ── Estilos do diagrama ───────────────────────────────────────────────────────
 const d = StyleSheet.create({
-  diagramWrap: { alignItems: "center", paddingVertical: 8 },
-  frontView: { alignItems: "center", marginBottom: 12 },
-  circle: { justifyContent: "center", alignItems: "center" },
-  tapeRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
-  tapeLine: { height: 3, width: 80, borderRadius: 2 },
-  tapeLabel: { fontSize: 11, fontWeight: "600" },
-  espRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
-  espLine: { height: 3, width: 40, borderRadius: 2 },
-  espLabel: { fontSize: 11, fontWeight: "600" },
-  radiiRow: { flexDirection: "row", gap: 16, marginBottom: 8 },
-  radiiItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  radiiLine: { height: 2.5, borderRadius: 2 },
-  radiiLabel: { fontSize: 11, fontWeight: "700" },
-  legend: { flexDirection: "row", flexWrap: "wrap", gap: 10, justifyContent: "center" },
-  legendItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  legendDot: { width: 8, height: 8, borderRadius: 2 },
-  legendTxt: { fontSize: 10, color: "#64748b" },
+  wrap:      { borderRadius: 14, borderWidth: 1, padding: 14, marginBottom: 14 },
+  front:     { alignItems: "center" },
+  ring:      { justifyContent: "center", alignItems: "center" },
+  annotRow:  { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 8 },
+  annotLine: { height: 2.5, borderRadius: 2 },
+  annotLbl:  { fontSize: 11, fontWeight: "600" },
 });
 
-// ── Estilos gerais ────────────────────────────────────────────────────────────
+const sc = StyleSheet.create({
+  card:  { flexDirection:"row", gap:10, padding:12, borderRadius:10,
+           marginBottom:8, borderWidth:1.5 },
+  badge: { width:26, height:26, borderRadius:13, justifyContent:"center",
+           alignItems:"center", flexShrink:0 },
+  badgeTxt: { color:"#fff", fontSize:12, fontWeight:"700" },
+  title: { fontSize:12, fontWeight:"600", marginBottom:2 },
+  desc:  { fontSize:11, lineHeight:16 },
+});
+
+const rc = StyleSheet.create({
+  chip:  { borderRadius:10, borderWidth:1, padding:8, alignItems:"center", margin:3 },
+  label: { fontSize:9, fontWeight:"600", letterSpacing:0.5,
+           textTransform:"uppercase", marginBottom:2 },
+  value: { fontWeight:"600" },
+});
+
 const s = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: "#f8fafc" },
-  container: { padding: 16, paddingBottom: 40 },
-  card: {
-    backgroundColor: "#fff", borderRadius: 16,
-    borderWidth: 1, borderColor: "#e2e8f0",
-    padding: 14, marginBottom: 14,
-  },
-  cardTitle: {
-    fontSize: 13, fontWeight: "600", color: "#1e293b", marginBottom: 12,
-  },
-  stepCard: {
-    flexDirection: "row", gap: 10, padding: 12,
-    borderRadius: 10, marginBottom: 8,
-    borderWidth: 1.5, borderColor: "#e2e8f0",
-    backgroundColor: "#f8fafc",
-  },
-  stepBadge: {
-    width: 26, height: 26, borderRadius: 13,
-    justifyContent: "center", alignItems: "center", flexShrink: 0,
-  },
-  stepBadgeTxt: { color: "#fff", fontSize: 12, fontWeight: "700" },
-  stepTitle: { fontSize: 12, fontWeight: "600", marginBottom: 2 },
-  stepDesc: { fontSize: 11, color: "#64748b", lineHeight: 16 },
-  inpWrap: { marginBottom: 12 },
-  inpLabel: { fontSize: 11, fontWeight: "600", marginBottom: 4, letterSpacing: 0.3 },
-  inpRow: { flexDirection: "row", gap: 8 },
-  inp: {
-    flex: 1, padding: 10, borderWidth: 1.5,
-    borderColor: "#e2e8f0", borderRadius: 8,
-    fontSize: 14, color: "#1e293b",
-  },
-  inpUnit: {
-    paddingHorizontal: 12, borderRadius: 8,
-    justifyContent: "center", alignItems: "center",
-  },
-  inpUnitTxt: { fontSize: 12, fontWeight: "600" },
-  inpHint: { fontSize: 11, marginTop: 4, fontWeight: "500" },
-  calcBtn: {
-    backgroundColor: "#6366f1", borderRadius: 10,
-    padding: 13, alignItems: "center", marginTop: 4,
-  },
-  calcBtnTxt: { color: "#fff", fontSize: 14, fontWeight: "600" },
-  chipGrid2: { flexDirection: "row", gap: 8, marginBottom: 8 },
-  chipGrid3: { flexDirection: "row", gap: 6, marginBottom: 12 },
-  chip: {
-    flex: 1, borderRadius: 10, borderWidth: 1,
-    padding: 8, alignItems: "center",
-  },
-  chipLabel: {
-    fontSize: 9, fontWeight: "600", letterSpacing: 0.5,
-    textTransform: "uppercase", marginBottom: 2,
-  },
-  chipValue: { fontSize: 15, fontWeight: "600", color: "#1e293b" },
-  formulaBox: {
-    backgroundColor: "#f8fafc", borderRadius: 10,
-    borderWidth: 1, borderColor: "#e2e8f0",
-    padding: 12, marginBottom: 12,
-  },
-  formulaTitle: { fontSize: 11, fontWeight: "700", color: "#1e293b", marginBottom: 6 },
-  formulaLine: { fontSize: 11, color: "#64748b", lineHeight: 20 },
-  formulaBold: { fontWeight: "700", color: "#1e293b" },
-  resetBtn: {
-    backgroundColor: "#f1f5f9", borderRadius: 10,
-    padding: 11, alignItems: "center",
-    borderWidth: 1, borderColor: "#e2e8f0",
-  },
-  resetBtnTxt: { color: "#64748b", fontSize: 13, fontWeight: "500" },
-  tipBox: {
-    backgroundColor: "#fffbeb", borderRadius: 12,
-    borderWidth: 1, borderColor: "#fde68a",
-    padding: 12, marginBottom: 8,
-  },
-  tipTitle: { fontSize: 12, fontWeight: "700", color: "#92400e", marginBottom: 4 },
-  tipTxt: { fontSize: 11, color: "#92400e", lineHeight: 17 },
+  scroll:   { flex:1 },
+  container:{ padding:16, paddingBottom:40 },
+  card:     { borderRadius:14, borderWidth:1, padding:14, marginBottom:14 },
+  cardTitle:{ fontSize:13, fontWeight:"600", marginBottom:12 },
+  inpWrap:  { marginBottom:12 },
+  inpLabel: { fontSize:11, fontWeight:"600", marginBottom:4, letterSpacing:0.3 },
+  inpRow:   { flexDirection:"row", gap:8 },
+  inp:      { flex:1, padding:10, borderWidth:1.5, borderRadius:8, fontSize:14 },
+  unit:     { paddingHorizontal:12, borderRadius:8,
+              justifyContent:"center", alignItems:"center" },
+  unitTxt:  { fontSize:12, fontWeight:"600" },
+  hint:     { fontSize:11, marginTop:4, fontWeight:"500" },
+  calcBtn:  { borderRadius:10, padding:13, alignItems:"center", marginTop:4 },
+  calcBtnTxt:{ color:"#fff", fontSize:14, fontWeight:"600" },
+  mainResult:{ borderRadius:12, borderWidth:1.5, padding:14,
+               alignItems:"center", marginBottom:10 },
+  mainLabel: { fontSize:10, fontWeight:"700", letterSpacing:1,
+               textTransform:"uppercase", marginBottom:4 },
+  mainValue: { fontSize:28, fontWeight:"600", lineHeight:34 },
+  mainUnit:  { fontSize:18 },
+  mainPi:    { fontSize:11, marginTop:2 },
+  chipRow:   { flexDirection:"row", marginHorizontal:-3, marginBottom:4 },
+  formula:   { borderRadius:10, borderWidth:1, padding:12, marginTop:8, marginBottom:12 },
+  formulaTitle:{ fontSize:11, fontWeight:"700", marginBottom:6 },
+  formulaLine: { fontSize:11, lineHeight:20 },
+  resetBtn:  { borderRadius:10, padding:11, alignItems:"center", borderWidth:1 },
+  resetTxt:  { fontSize:13, fontWeight:"500" },
+  tip:       { borderRadius:12, borderWidth:1, padding:12, marginBottom:8 },
+  tipTitle:  { fontSize:12, fontWeight:"700", color:"#92400e", marginBottom:4 },
+  tipTxt:    { fontSize:11, color:"#92400e", lineHeight:17 },
 });

@@ -1,16 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// PixelView — renderiza um grid 8×8 de pixel art
-// Aceita: px + pal (material padrão) OU grid (material customizado)
+// PixelView — renderiza pixel art (8×8 ou 16×16)
+// WeightSynth v1.2.071326-BETA
 // ─────────────────────────────────────────────────────────────────────────────
 import React from "react";
 import { View } from "react-native";
 
-export default function PixelView({ px, pal, grid, size = 6 }) {
+export default function PixelView({ px, pal, grid, size = 4 }) {
   const rows = grid || px;
   if (!rows) return null;
 
+  const n = rows.length; // detecta automaticamente 8 ou 16
+  const cellSize = size;
+
   return (
-    <View style={{ width: size * 8, height: size * 8 }}>
+    <View style={{ width: cellSize * n, height: cellSize * n }}>
       {rows.map((row, y) => (
         <View key={y} style={{ flexDirection: "row" }}>
           {row.map((cell, x) => {
@@ -24,9 +27,10 @@ export default function PixelView({ px, pal, grid, size = 6 }) {
               <View
                 key={x}
                 style={{
-                  width: size,
-                  height: size,
-                  backgroundColor: color === "transparent" ? "rgba(0,0,0,0)" : color,
+                  width: cellSize,
+                  height: cellSize,
+                  backgroundColor:
+                    color === "transparent" ? "rgba(0,0,0,0)" : color,
                 }}
               />
             );
